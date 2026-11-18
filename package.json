@@ -6,7 +6,8 @@
   ],
   "scripts": {
     "build": "tsc -b packages/core packages/react packages/react-native",
-    "test": "npm run build && tsx --test packages/core/src/*.test.ts packages/react/test/*.test.ts"
+    "test": "npm run build && tsx --test packages/core/src/*.test.ts packages/react/test/*.test.ts",
+    "test:integration": "tsx --test packages/core/test/e2e.test.ts"
   },
   "overrides": {
     "@types/react": "^18.3.0"

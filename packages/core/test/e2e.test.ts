@@ -1,17 +1,11 @@
-// Live end-to-end check against a running Pinpost server (go run ./cmd/server).
-// Mirrors the Go contract test's skip-if-down behavior.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createClient } from "./index.js";
+import { createClient } from "@pinpost/core";
 
 const API = process.env.PINPOST_API_URL ?? "http://localhost:8787";
 const WRITE_KEY = process.env.PINPOST_WRITE_KEY ?? "wk_demo_5f8a2c91d4e7b3a6f0c1";
 
-const serverUp = await fetch(`${API}/v1/sdk/config`, {
-  headers: { "X-Pinpost-Write-Key": WRITE_KEY },
-}).then((r) => r.ok, () => false);
-
-test("live: submit feedback with attachment, visible in dashboard", { skip: !serverUp && "server not running" }, async () => {
+test("live: submit feedback with attachment, visible in dashboard", async () => {
   const client = createClient({ writeKey: WRITE_KEY, apiUrl: API });
   const config = await client.getConfig();
   assert.ok(config.environment);
@@ -22,9 +16,7 @@ test("live: submit feedback with attachment, visible in dashboard", { skip: !ser
   const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Array(60).fill(0x78)]);
   const attachmentId = await client.uploadAttachment({ name: "e2e.png", mimeType: "image/png", data: png });
 
-  // The bytes went straight to object storage. In a deployed stack the bucket's
-  // ObjectCreated event runs the scan; locally there is no event wiring, so the
-  // dev route the server exposes for exactly this runs it inline.
+  // Scan immediately so this check does not wait for the background worker.
   const scanned = await fetch(`${API}/dev/scan/${attachmentId}`, { method: "POST" });
   assert.equal(scanned.status, 200, "dev scan route (local server only) must be reachable");
 

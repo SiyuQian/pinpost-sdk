@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  sdk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm pack --workspaces --dry-run
+
+      - name: Check out the server used for SDK compatibility testing
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: SiyuQian/pinpost
+          ref: b555458fa25017c47d238ea3bcb36e503de23c0f
+          path: pinpost-server
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: pinpost-server/go.mod
+          cache-dependency-path: pinpost-server/go.sum
+      - run: docker compose up -d --wait postgres s3
+        working-directory: pinpost-server
+      - name: Test the SDK against the server
+        env:
+          PINPOST_API_URL: http://127.0.0.1:8787
+        run: |
+          (cd pinpost-server && go build -o "$RUNNER_TEMP/pinpost" ./cmd/server)
+          (
+            cd pinpost-server
+            source ./local.env
+            PINPOST_SEED_DEMO=1 ADDR=127.0.0.1:8787 exec "$RUNNER_TEMP/pinpost"
+          ) > "$RUNNER_TEMP/pinpost.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          curl --fail --silent --show-error --retry 30 --retry-connrefused --retry-delay 1 \
+            http://127.0.0.1:8787/healthz
+          npm run test:integration
+      - if: failure()
+        run: |
+          if [[ -f "$RUNNER_TEMP/pinpost.log" ]]; then
+            cat "$RUNNER_TEMP/pinpost.log"
+          fi
+          docker compose -f pinpost-server/docker-compose.yml logs
