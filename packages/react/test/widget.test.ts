@@ -151,14 +151,27 @@ test("provider disables automatic browser context", async (t) => {
   }
 });
 
-test("dialog limits its width and wraps the rating row", async () => {
+test("dialog fits the viewport and wraps the rating row", async () => {
   const { container, root } = await mount();
   try {
     const dialog = container.querySelector<HTMLElement>('[role="dialog"]')!;
     const rating = container.querySelector<HTMLElement>('[aria-label="Satisfaction rating (optional)"]')!;
     assert.equal(dialog.style.maxWidth, "calc(100% - 40px)");
     assert.equal(dialog.style.boxSizing, "border-box");
+    assert.equal(dialog.style.maxHeight, "calc(100dvh - 88px)");
+    assert.equal(dialog.style.overflowY, "auto");
     assert.equal(rating.style.flexWrap, "wrap");
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
+
+test("feedback dialog allows navigation in the host page", async () => {
+  const { container, root } = await mount();
+  try {
+    const dialog = container.querySelector('[role="dialog"]')!;
+    assert.notEqual(dialog.getAttribute("aria-modal"), "true");
   } finally {
     await act(async () => root.unmount());
     container.remove();

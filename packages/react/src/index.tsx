@@ -244,6 +244,8 @@ const makeStyles = (t: FeedbackTheme) =>
       insetInlineEnd: 20,
       width: 374,
       maxWidth: "calc(100% - 40px)",
+      maxHeight: "calc(100dvh - 88px)",
+      overflowY: "auto",
       boxSizing: "border-box",
       background: t.surface,
       color: t.text,
@@ -969,7 +971,6 @@ export function FeedbackWidget(props: { strings?: Partial<FeedbackStrings> } = {
         <div
           ref={dialogRef}
           role="dialog"
-          aria-modal="true"
           aria-label={t.dialogLabel}
           style={s.dialog}
           onPaste={handlePaste}
