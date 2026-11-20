@@ -48,6 +48,10 @@ export function App() {
 }
 ```
 
+Pass `collectContext={false}` to `PinpostProvider` to omit automatic browser
+context such as the current URL and referrer. Explicit context supplied through
+`usePinpost().setContext()` still accompanies feedback.
+
 For Expo or bare React Native, follow the [React Native setup guide](packages/react-native/README.md).
 
 ## Development
