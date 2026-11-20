@@ -12,6 +12,7 @@ let act: typeof import("react").act;
 let createRoot: typeof import("react-dom/client").createRoot;
 let PinpostProvider: typeof import("@pinpost/react").PinpostProvider;
 let FeedbackWidget: typeof import("@pinpost/react").FeedbackWidget;
+let usePinpost: typeof import("@pinpost/react").usePinpost;
 
 before(async () => {
   dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
@@ -33,7 +34,7 @@ before(async () => {
 
   ({ act } = await import("react"));
   ({ createRoot } = await import("react-dom/client"));
-  ({ PinpostProvider, FeedbackWidget } = await import("@pinpost/react"));
+  ({ PinpostProvider, FeedbackWidget, usePinpost } = await import("@pinpost/react"));
 });
 
 after(() => dom.window.close());
@@ -101,6 +102,68 @@ async function mount(opts: { upload?: () => Promise<unknown> } = {}) {
   });
   return { container, calls, root };
 }
+
+test("provider disables automatic browser context", async (t) => {
+  const location = Object.getOwnPropertyDescriptor(globalThis, "location");
+  Object.defineProperty(globalThis, "location", {
+    configurable: true,
+    value: new URL("https://example.test/settings?fixture=value"),
+  });
+  t.after(() => {
+    if (location) Object.defineProperty(globalThis, "location", location);
+    else Reflect.deleteProperty(globalThis, "location");
+  });
+
+  for (const collectContext of [undefined, false]) {
+    let captured: { context: Record<string, string> } | undefined;
+    let pinpost: ReturnType<typeof usePinpost> | undefined;
+    function ReadProvider() {
+      pinpost = usePinpost();
+      return null;
+    }
+    globalThis.fetch = async (_url, request) => {
+      captured = JSON.parse(String(request?.body));
+      return Response.json({ feedback_id: "fixture-feedback" }, { status: 201 });
+    };
+    const root = createRoot(dom.window.document.createElement("div"));
+    try {
+      await act(async () => {
+        root.render(
+          createElement(
+            PinpostProvider,
+            { writeKey: "wk_fixture", apiUrl: "https://pinpost.test", collectContext },
+            createElement(ReadProvider),
+          ),
+        );
+      });
+      assert.ok(pinpost);
+      pinpost.setContext({ section: "settings" });
+      await pinpost.submit({ type: "suggestion", message: "Fixture feedback" });
+      assert.ok(captured);
+      if (collectContext === false) {
+        assert.deepEqual(captured.context, { section: "settings" });
+      } else {
+        assert.equal(captured.context.url, "https://example.test/settings");
+      }
+    } finally {
+      await act(async () => root.unmount());
+    }
+  }
+});
+
+test("dialog limits its width and wraps the rating row", async () => {
+  const { container, root } = await mount();
+  try {
+    const dialog = container.querySelector<HTMLElement>('[role="dialog"]')!;
+    const rating = container.querySelector<HTMLElement>('[aria-label="Satisfaction rating (optional)"]')!;
+    assert.equal(dialog.style.maxWidth, "calc(100% - 40px)");
+    assert.equal(dialog.style.boxSizing, "border-box");
+    assert.equal(rating.style.flexWrap, "wrap");
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
 
 const textFile = (name: string, body = "hello") =>
   new dom.window.File([body], name, { type: "text/plain" });

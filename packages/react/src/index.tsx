@@ -242,7 +242,9 @@ const makeStyles = (t: FeedbackTheme) =>
       position: "fixed",
       insetBlockEnd: 72,
       insetInlineEnd: 20,
-      width: 340,
+      width: 374,
+      maxWidth: "calc(100% - 40px)",
+      boxSizing: "border-box",
       background: t.surface,
       color: t.text,
       colorScheme: "light dark",
@@ -457,7 +459,7 @@ const makeStyles = (t: FeedbackTheme) =>
       padding: "4px 8px",
     },
     hint: { fontSize: 12, color: t.textFaint },
-    stars: { display: "flex", alignItems: "center", gap: 2 },
+    stars: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 2 },
     starWord: { fontSize: 12, color: t.textMuted, marginInlineStart: 8 },
     // 20px glyph + 12px padding each side = a 44x44 target per star. The row
     // is 5*44 + 4*2 gap = 228px, well inside the 340px dialog, so the targets
@@ -521,14 +523,16 @@ export function PinpostProvider(props: {
   writeKey: string;
   apiUrl?: string;
   environment?: string;
+  /** Include browser context such as the current URL by default. */
+  collectContext?: boolean;
   /** locale overrides applied to every widget under this provider */
   strings?: Partial<FeedbackStrings>;
   children?: ReactNode;
 }) {
-  const { writeKey, apiUrl, environment, strings, children } = props;
+  const { writeKey, apiUrl, environment, collectContext, strings, children } = props;
   const client = useMemo(
-    () => new PinpostClient({ writeKey, apiUrl, environment }),
-    [writeKey, apiUrl, environment],
+    () => new PinpostClient({ writeKey, apiUrl, environment, collectContext }),
+    [writeKey, apiUrl, environment, collectContext],
   );
   const [isOpen, setIsOpen] = useState(false);
   const resolved = useMemo<FeedbackStrings>(
